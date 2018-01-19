@@ -23,9 +23,11 @@ public class DemoNick extends Robot
 		// Robot main loop
 		while(true) {
 			// Replace the next 4 lines with any behavior you would like
-			ahead(100);
+			ahead(50);
 			turnRadarRight(360);
 			turnRight(30);
+			ahead(50);
+			turnLeft(30);
 		}
 	}
 
@@ -47,9 +49,9 @@ public class DemoNick extends Robot
 	 */
 	public void onHitByBullet(HitByBulletEvent e) {
 		// Replace the next line with any behavior you would like
-        back(100);
-		turnRight(90);
-		back(100);
+        back(300);
+		turnRight(45);
+		back(300);
 	}
 	
 	/**
