@@ -4,6 +4,7 @@ import robocode.AdvancedRobot;
 import robocode.BulletHitEvent;
 import robocode.Event;
 import robocode.HitRobotEvent;
+import robocode.HitWallEvent;
 import robocode.RobotDeathEvent;
 import robocode.Rules;
 import robocode.ScannedRobotEvent;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Vector;
 
+import static java.lang.Math.PI;
 import static java.lang.Math.abs;
 import static java.util.Comparator.comparingDouble;
 import static java.util.Comparator.comparingLong;
@@ -36,8 +38,6 @@ public class SamsFirstBot extends AdvancedRobot {
     LinkedList<Long> oldesRobotTime = new LinkedList<>();
 
     public void run() {
-        // setColors(Color.red,Color.blue,Color.green); // body,gun,radar
-
         radar.init();
         gun.init();
 
@@ -57,13 +57,6 @@ public class SamsFirstBot extends AdvancedRobot {
 
     @Override
     public void onStatus(StatusEvent e) {
-//        System.out.println("T1: " + getTime() + " T2: " + e.getTime());
-//        getAllEvents().forEach(e1 ->
-////                System.out.println("  " + e1.getClass().getSimpleName() + " time: " + e1.getTime() + " " + e1.getPriority())
-//        );
-        System.out.println("                            Heat: " + getGunHeat());
-//        System.out.println("                          Energy: " + getEnergy());
-
         radar.onStatus(e);
         gun.onStatus(e);
         radar.spottedRobots.values().stream().min(comparingLong(r -> r.time)).ifPresent(r -> {
@@ -140,7 +133,7 @@ public class SamsFirstBot extends AdvancedRobot {
 
     private Point2D getPredictedPoint(RobotStatus r) {
         double distance = getDistanceTo(r);
-        double timeToReachTarget = distance / Rules.getBulletSpeed(1);
+        double timeToReachTarget = distance / Rules.getBulletSpeed(2);
         double targetMoveTime = getTime() - r.time + timeToReachTarget;
 
         return getPredictedPosition(r, targetMoveTime);
@@ -213,12 +206,16 @@ public class SamsFirstBot extends AdvancedRobot {
             if (getGunHeat() == 0d && bestTarget.isPresent()) {
                 double gunTurn = getGunTurnToTarget(bestTarget.get());
                 setTurnGunRight(gunTurn);
-                if (getDistanceTo(bestTarget.get()) < 100) {
-                    setFire(3);
-                } else {
-                    setFire(0.5);
-                }
+                double distance = getDistanceTo(bestTarget.get());
                 targetName = bestTarget.get().name;
+                if (distance < 150) {
+                    setFire(3);
+                } else if (distance < 300) {
+                    setFire(1);
+                } else {
+                    setFire(0.1);
+                    targetName = null;
+                }
             } else {
                 if (getTarget() == null) {
                     radar.spottedRobots.values()
@@ -254,26 +251,30 @@ public class SamsFirstBot extends AdvancedRobot {
     class CruiseControl {
         double positionX;
         double positionY;
+        boolean isBackward;
 
         void onStatus(StatusEvent e) {
             if (abs(getDistanceRemaining()) < 5) {
-                positionX = 36 + (getBattleFieldWidth() - 72) * Utils.getRandom().nextFloat();
-                positionY = 36 + (getBattleFieldHeight() - 72) * Utils.getRandom().nextFloat();
+                positionX = 50 + (getBattleFieldWidth() - 100) * Utils.getRandom().nextFloat();
+                positionY = 50 + (getBattleFieldHeight() - 100) * Utils.getRandom().nextFloat();
 
                 double directionRad = Math.atan2(positionX - getX(), positionY - getY());
 
-                setTurnRightRadians(Utils.normalRelativeAngle(directionRad - getHeadingRadians()));
-                setAhead(Point2D.distance(getX(), getY(), positionX, positionY));
-            }
-            for (HitRobotEvent event : filter(getAllEvents(), HitRobotEvent.class)) {
-                setBack(100);
-                if (Utils.getRandom().nextFloat() > 0.5) {
-                    setTurnRight(90);
+                if (isBackward) {
+                    setBack(Point2D.distance(getX(), getY(), positionX, positionY));
+                    setTurnRightRadians(Utils.normalRelativeAngle(directionRad - getHeadingRadians() + PI));
                 } else {
-                    setTurnLeft(90);
+                    setTurnRightRadians(Utils.normalRelativeAngle(directionRad - getHeadingRadians()));
+                    setAhead(Point2D.distance(getX(), getY(), positionX, positionY));
                 }
             }
-
+            for (HitRobotEvent event : filter(getAllEvents(), HitRobotEvent.class)) {
+                setAhead(0);
+                setTurnRight(0);
+            }
+            for (HitWallEvent event : filter(getAllEvents(), HitWallEvent.class)) {
+                isBackward = !isBackward;
+            }
         }
 
         void onPaint(Graphics2D g) {
@@ -328,25 +329,6 @@ public class SamsFirstBot extends AdvancedRobot {
 
         void onStatus(StatusEvent e) {
             Vector<Event> events = getAllEvents();
-
-//            // todo cancel hit by bullet waves
-//            for (BulletHitBulletEvent event : filter(events, BulletHitBulletEvent.class)) {
-//                Bullet hitBullet = event.getHitBullet();
-//
-////                for (ShootWave wave : waves) {
-////                    if (eq(wave.x, hitBullet.getX(), 5)
-////                            && eq(wave.y, hitBullet.getY(), 5)
-////                            && eq(wave.energyDrop, hitBullet.getPower(), 0.1)) {
-////                        wave.color = Color.YELLOW;
-////                        System.out.println("Wave " + wave.x + "," + wave.y + " p: " + wave.energyDrop);
-////                    }
-////                }
-//
-//
-//                Bullet bullet = event.getBullet();
-//                System.out.println("Hit bullet x: " + hitBullet.getX() + " y: " + hitBullet.getY() + " name: " + hitBullet.getName());
-//                System.out.println("    bullet x: " + bullet.getX() + " y: " + bullet.getY() + " name: " + bullet.getName());
-//            }
 
             // Register collision with me
             for (HitRobotEvent event : filter(events, HitRobotEvent.class)) {
