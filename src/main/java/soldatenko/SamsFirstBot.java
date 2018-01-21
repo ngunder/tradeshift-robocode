@@ -25,7 +25,6 @@ import java.util.Optional;
 import java.util.Vector;
 
 import static java.lang.Math.abs;
-import static java.lang.Math.max;
 import static java.util.Comparator.comparingDouble;
 import static java.util.Comparator.comparingLong;
 
@@ -74,12 +73,12 @@ public class SamsFirstBot extends AdvancedRobot {
 
     @Override
     public void onStatus(StatusEvent e) {
-        System.out.println("T1: " + getTime() + " T2: " + e.getTime());
-        getAllEvents().forEach(e1 ->
-                System.out.println("  " + e1.getClass().getSimpleName() + " time: " + e1.getTime() + " " + e1.getPriority())
-        );
+//        System.out.println("T1: " + getTime() + " T2: " + e.getTime());
+//        getAllEvents().forEach(e1 ->
+////                System.out.println("  " + e1.getClass().getSimpleName() + " time: " + e1.getTime() + " " + e1.getPriority())
+//        );
         System.out.println("                            Heat: " + getGunHeat());
-        System.out.println("                          Energy: " + getEnergy());
+//        System.out.println("                          Energy: " + getEnergy());
 
         radar.onStatus(e);
         gun.onStatus(e);
@@ -228,11 +227,9 @@ public class SamsFirstBot extends AdvancedRobot {
                 double gunTurn = getGunTurnToTarget(bestTarget.get());
                 setTurnGunRight(gunTurn);
                 if (getDistanceTo(bestTarget.get()) < 100) {
-                    setFire(1);
-                    System.out.println("                       Fire 1");
+                    setFire(3);
                 } else {
-                    setFire(0.1);
-                    System.out.println("                       Fire 0.1");
+                    setFire(0.5);
                 }
                 targetName = bestTarget.get().name;
             } else {
@@ -365,6 +362,15 @@ public class SamsFirstBot extends AdvancedRobot {
                 robots.remove(event.getName());
                 waves.removeIf(w -> w.name.equals(event.getName()));
             }
+
+            // update waves radius
+            for (Iterator<ShootWave> i = waves.iterator(); i.hasNext(); ) {
+                ShootWave wave = i.next();
+                wave.currentRadius = (getTime() - wave.time) * Rules.getBulletSpeed(wave.energyDrop);
+                if (wave.currentRadius > Point2D.distance(getX(), getY(), wave.x, wave.y) + 100) {
+                    i.remove();
+                }
+            }
         }
 
         void detect(RobotStatus oldStatus, RobotStatus newStatus) {
@@ -386,38 +392,33 @@ public class SamsFirstBot extends AdvancedRobot {
 
                     waves.add(wave);
 
-                    double distance = Point2D.distance(oldStatus.x, oldStatus.y, enemy.x, enemy.y);
-                    double timeToReachTarget = distance / Rules.getBulletSpeed(energyDrop);
-                    Point2D predictedPosition = getPredictedPosition(enemy, timeToReachTarget);
-
-                    ShootWave wave2 = new ShootWave();
-                    wave.name = oldStatus.name;
-                    wave2.x = oldStatus.x;
-                    wave2.y = oldStatus.y;
-                    wave2.time = oldStatus.time;
-                    wave2.energyDrop = energyDrop;
-                    wave2.directionRad = Math.atan2(predictedPosition.getX() - oldStatus.x, predictedPosition.getY() - oldStatus.y);
-                    wave2.color = Color.GREEN;
-                    waves.add(wave2);
+//                    double distance = Point2D.distance(oldStatus.x, oldStatus.y, enemy.x, enemy.y);
+//                    double timeToReachTarget = distance / Rules.getBulletSpeed(energyDrop);
+//                    Point2D predictedPosition = getPredictedPosition(enemy, timeToReachTarget);
+//
+//                    ShootWave wave2 = new ShootWave();
+//                    wave.name = oldStatus.name;
+//                    wave2.x = oldStatus.x;
+//                    wave2.y = oldStatus.y;
+//                    wave2.time = oldStatus.time;
+//                    wave2.energyDrop = energyDrop;
+//                    wave2.directionRad = Math.atan2(predictedPosition.getX() - oldStatus.x, predictedPosition.getY() - oldStatus.y);
+//                    wave2.color = Color.GREEN;
+//                    waves.add(wave2);
                 }
             }
         }
 
         void onPaint(Graphics2D g) {
-            Iterator<ShootWave> iterator = waves.iterator();
-            while (iterator.hasNext()) {
-                ShootWave wave = iterator.next();
-                double radius = (getTime() - wave.time) * Rules.getBulletSpeed(wave.energyDrop);
+            for (ShootWave wave : waves) {
                 double degree = (wave.directionRad / Math.PI * 180) - 90; // Arc's 0 is different.
                 g.setColor(wave.color);
-                Arc2D.Double arc = new Arc2D.Double(wave.x - radius, wave.y - radius, radius * 2, radius * 2,
+                double d = wave.currentRadius * 2;
+                Arc2D.Double arc = new Arc2D.Double(wave.x - wave.currentRadius, wave.y - wave.currentRadius, d, d,
                         degree - 5, 10, Arc2D.OPEN);
                 g.draw(arc);
-                if (radius > max(getBattleFieldWidth(), getBattleFieldHeight())) {
-                    iterator.remove();
-                }
             }
-            System.out.println("Waves: " + waves.size());
+//            System.out.println("Waves: " + waves.size());
         }
     }
 
@@ -429,6 +430,7 @@ public class SamsFirstBot extends AdvancedRobot {
         double y;
         double energyDrop;
         Color color;
+        double currentRadius;
     }
 }
 
