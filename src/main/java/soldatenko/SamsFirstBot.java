@@ -3,9 +3,7 @@ package soldatenko;
 import robocode.AdvancedRobot;
 import robocode.BulletHitEvent;
 import robocode.Event;
-import robocode.HitByBulletEvent;
 import robocode.HitRobotEvent;
-import robocode.HitWallEvent;
 import robocode.RobotDeathEvent;
 import robocode.Rules;
 import robocode.ScannedRobotEvent;
@@ -32,6 +30,7 @@ public class SamsFirstBot extends AdvancedRobot {
 
     Radar radar = new Radar();
     GunControl gun = new GunControl();
+    CruiseControl cruiseControl = new CruiseControl();
     ShootDetector shootDetector = new ShootDetector();
 
     LinkedList<Long> oldesRobotTime = new LinkedList<>();
@@ -43,27 +42,12 @@ public class SamsFirstBot extends AdvancedRobot {
         gun.init();
 
         while (true) {
-
-            ahead(100);
-
-            back(100);
+            doNothing();
         }
     }
 
     public void onScannedRobot(ScannedRobotEvent e) {
         radar.onScannedRobot(e);
-    }
-
-    public void onHitByBullet(HitByBulletEvent e) {
-        setTurnRight(90);
-    }
-
-    public void onHitWall(HitWallEvent e) {
-        if (Utils.getRandom().nextFloat() > 0.5) {
-            back(20);
-        } else {
-            ahead(20);
-        }
     }
 
     @Override
@@ -91,6 +75,7 @@ public class SamsFirstBot extends AdvancedRobot {
             }
         });
         shootDetector.onStatus(e);
+        cruiseControl.onStatus(e);
     }
 
     @Override
@@ -98,11 +83,9 @@ public class SamsFirstBot extends AdvancedRobot {
         g.setColor(Color.WHITE);
         radar.spottedRobots.values().forEach(r -> {
             g.setColor(Color.WHITE);
-            g.drawOval((int) r.x, (int) r.y, 10, 10);
-            g.setColor(Color.WHITE);
             Point2D pr = getPredictedPoint(r);
             g.fillOval((int) pr.getX(), (int) pr.getY(), 10, 10);
-            g.drawString(r.name, (float) r.x + 50, (float) r.y);
+            g.drawLine((int) pr.getX(), (int) pr.getY(), (int) r.x, (int) r.y);
         });
 
         RobotStatus target = gun.getTarget();
@@ -126,6 +109,7 @@ public class SamsFirstBot extends AdvancedRobot {
             x += 10;
         }
         shootDetector.onPaint(g);
+        cruiseControl.onPaint(g);
     }
 
     boolean eq(double a, double b, double delta) {
@@ -219,6 +203,9 @@ public class SamsFirstBot extends AdvancedRobot {
         }
 
         void onStatus(StatusEvent e) {
+            for (HitRobotEvent event : filter(getAllEvents(), HitRobotEvent.class)) {
+                targetName = event.getName();
+            }
             Optional<RobotStatus> bestTarget = radar.spottedRobots.values()
                     .stream()
                     .filter(r -> Math.abs(getGunTurnToTarget(r)) < Rules.GUN_TURN_RATE)
@@ -261,6 +248,38 @@ public class SamsFirstBot extends AdvancedRobot {
                     .filter(r -> r.name.equals(targetName))
                     .findFirst()
                     .orElse(null);
+        }
+    }
+
+    class CruiseControl {
+        double positionX;
+        double positionY;
+
+        void onStatus(StatusEvent e) {
+            if (abs(getDistanceRemaining()) < 5) {
+                positionX = 36 + (getBattleFieldWidth() - 72) * Utils.getRandom().nextFloat();
+                positionY = 36 + (getBattleFieldHeight() - 72) * Utils.getRandom().nextFloat();
+
+                double directionRad = Math.atan2(positionX - getX(), positionY - getY());
+
+                setTurnRightRadians(Utils.normalRelativeAngle(directionRad - getHeadingRadians()));
+                setAhead(Point2D.distance(getX(), getY(), positionX, positionY));
+            }
+            for (HitRobotEvent event : filter(getAllEvents(), HitRobotEvent.class)) {
+                setBack(100);
+                if (Utils.getRandom().nextFloat() > 0.5) {
+                    setTurnRight(90);
+                } else {
+                    setTurnLeft(90);
+                }
+            }
+
+        }
+
+        void onPaint(Graphics2D g) {
+            g.setColor(Color.GREEN);
+            g.fillOval((int) positionX - 5, (int) positionY - 5, 10, 10);
+            g.drawLine((int) positionX, (int) positionY, (int) getX(), (int) getY());
         }
     }
 
